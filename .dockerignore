@@ -1,0 +1,21 @@
+# 构建镜像时排除以下内容：减小镜像体积、避免把本地配置带进镜像
+
+# 版本控制与 IDE 配置
+.git
+.gitignore
+.idea
+.vscode
+
+# Python 缓存与虚拟环境
+__pycache__
+*.py[cod]
+.pytest_cache
+.venv
+venv
+
+# 测试与文档（镜像运行不需要）
+tests
+README.md
+
+# CI 产物
+report.xml
