@@ -85,9 +85,9 @@ def add_api():
     return jsonify(result=add(a, b))
 
 
-@app.post("/who")
+@app.route("/who", methods=["GET", "POST"])
 def whom():
-    return "你是帅哥"
+    return jsonify(message="你是帅哥")
 
 if __name__ == "__main__":
     # 直接执行本文件时启动开发服务器。
