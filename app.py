@@ -85,6 +85,10 @@ def add_api():
     return jsonify(result=add(a, b))
 
 
+@app.post("/who")
+def whom():
+    return "你是帅哥"
+
 if __name__ == "__main__":
     # 直接执行本文件时启动开发服务器。
     # host="0.0.0.0" 让容器外部可以访问（只写 127.0.0.1 容器外访问不到）。
