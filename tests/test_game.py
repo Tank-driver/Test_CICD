@@ -45,11 +45,12 @@ def test_first_to_act_is_button():
 def test_fold_ends_hand():
     """弃牌后本手立即结束，对手赢得底池。"""
     game = new_game()
-    before = sum(game.stacks)
+    # 总筹码 = 手上筹码 + 本轮已下注（盲注已从筹码中扣除）
+    before = sum(game.stacks) + sum(game.street_bets)
     game.act(0, "fold")
     assert game.hand_over is True
     assert game.winner == 1
-    assert sum(game.stacks) == before  # 筹码守恒，只是换了主人
+    assert sum(game.stacks) + sum(game.street_bets) == before  # 筹码守恒，只是换了主人
 
 
 # ---------- 推进 ----------
