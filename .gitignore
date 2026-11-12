@@ -1,22 +1,21 @@
-# Python 字节码与缓存
+# Python
 __pycache__/
 *.py[cod]
-
-# pytest 缓存与测试报告
 .pytest_cache/
-report.xml
-
-# 虚拟环境
 .venv/
 venv/
 
-# IDE / 编辑器
+# 测试报告
+report.xml
+
+# IDE
 .idea/
 .vscode/
 
-# 操作系统生成的临时文件
+# 系统文件
 .DS_Store
 Thumbs.db
 
-# 本地环境变量（可能含密码，绝不提交）
+# 本地配置
 .env
+!.env.example

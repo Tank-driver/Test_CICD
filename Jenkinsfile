@@ -1,19 +1,13 @@
 /* ============================================================
- * CICD 演示项目的 Jenkins 流水线（完整 CI/CD）
+ * 单机德州扑克 CI/CD 流水线
  *
- * 阶段说明：
- *   1. Checkout     —— 从 Git 拉取代码
- *   2. Install      —— 创建虚拟环境并安装依赖
- *   3. Test         —— 运行 pytest，生成 JUnit 报告
- *   4. Docker Build —— 构建镜像，直接使用私有仓库前缀
- *   5. Push         —— 推送镜像到私有 Registry
- *   6. Deploy       —— SSH 到目标机执行部署脚本
- *   7. Smoke Test   —— 部署后访问 /health 验证服务可用
- *
- * 前置条件：
- *   - Jenkins 容器可访问 192.168.17.129:5000（私有 registry）
- *   - Jenkins 凭据 deploy-ssh 中存有目标机私钥
- *   - 目标机 /data/cicd-demo/deploy.sh 已就绪
+ * 1. Checkout  拉代码
+ * 2. Install   建虚拟环境装依赖
+ * 3. Test      跑 25 个用例（牌型判定 + 游戏流程）
+ * 4. Build     构建镜像
+ * 5. Push      推送到私有 registry
+ * 6. Deploy    SSH 到目标机执行 deploy.sh
+ * 7. Smoke     请求 /health 验证
  * ============================================================ */
 
 pipeline {
@@ -21,23 +15,22 @@ pipeline {
 
     options {
         timestamps()
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 20, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
     environment {
-        REGISTRY    = '192.168.17.129:5000'          // 私有镜像仓库地址
-        IMAGE_NAME  = 'cicd-demo'                    // 镜像名
-        IMAGE_TAG   = "${env.BUILD_NUMBER}"          // 用构建号做 tag，唯一且可回滚
-        FULL_IMAGE  = "${REGISTRY}/${IMAGE_NAME}"    // 完整镜像地址
-        DEPLOY_HOST = '192.168.17.130'               // 目标机 IP
-        DEPLOY_DIR  = '/data/cicd-demo'              // 目标机部署目录
-        VENV        = '.venv'                        // 虚拟环境目录
+        REGISTRY    = '192.168.17.129:5000'
+        IMAGE_NAME  = 'poker'
+        IMAGE_TAG   = "${env.BUILD_NUMBER}"
+        FULL_IMAGE  = "${REGISTRY}/${IMAGE_NAME}"
+        DEPLOY_HOST = '192.168.17.130'
+        DEPLOY_DIR  = '/data/cicd-demo'
+        VENV        = '.venv'
     }
 
     stages {
 
-        /* ---------- 1. 拉取代码 ---------- */
         stage('Checkout') {
             steps {
                 checkout scm
@@ -45,7 +38,6 @@ pipeline {
             }
         }
 
-        /* ---------- 2. 安装依赖 ---------- */
         stage('Install') {
             steps {
                 sh '''
@@ -59,7 +51,6 @@ pipeline {
             }
         }
 
-        /* ---------- 3. 单元测试 ---------- */
         stage('Test') {
             steps {
                 sh '''
@@ -73,8 +64,7 @@ pipeline {
             }
         }
 
-        /* ---------- 4. 构建镜像 ---------- */
-        stage('Docker Build') {
+        stage('Build') {
             steps {
                 sh '''
                     set -e
@@ -84,7 +74,6 @@ pipeline {
             }
         }
 
-        /* ---------- 5. 推送镜像 ---------- */
         stage('Push') {
             steps {
                 sh '''
@@ -95,7 +84,6 @@ pipeline {
             }
         }
 
-        /* ---------- 6. 部署到目标机 ---------- */
         stage('Deploy') {
             steps {
                 withCredentials([
@@ -117,13 +105,11 @@ pipeline {
             }
         }
 
-        /* ---------- 7. 部署后健康检查 ---------- */
         stage('Smoke Test') {
             steps {
                 sh '''
                     set -e
-                    # 等待容器启动，最多重试 10 次（每次间隔 3 秒）
-                    curl -fsS --retry 10 --retry-delay 3 \
+                    curl -fsS --retry 15 --retry-delay 2 --retry-connrefused \
                         http://$DEPLOY_HOST:8080/health
                     echo ""
                     echo "服务健康检查通过"

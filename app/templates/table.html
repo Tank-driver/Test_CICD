@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>单机德州扑克</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="table-wrap">
+    <header class="topbar">
+      <h1>♠ 单机德州扑克 ♥</h1>
+      <span class="street">第 {{ g.hand_no }} 手 · {{ g.street }}</span>
+    </header>
+
+    <!-- 机器人区域 -->
+    <section class="seat bot">
+      <div class="seat-head">
+        <span class="name">🤖 机器人</span>
+        <span class="stack">筹码 {{ g.bot_stack }}</span>
+        {% if g.bot_bet %}<span class="bet">本轮下注 {{ g.bot_bet }}</span>{% endif %}
+      </div>
+      <div class="cards">
+        {% for c in g.bot_cards %}
+          {% if c.hidden %}
+            <div class="card back"></div>
+          {% else %}
+            <div class="card {{ 'red' if c.red }}">
+              <span class="rank">{{ c.label }}</span>
+              <span class="suit">{{ c.suit_label }}</span>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- 公共牌与底池 -->
+    <section class="board">
+      <div class="pot">底池 <strong>{{ g.pot }}</strong></div>
+      <div class="cards">
+        {% for c in g.board %}
+          <div class="card {{ 'red' if c.red }}">
+            <span class="rank">{{ c.label }}</span>
+            <span class="suit">{{ c.suit_label }}</span>
+          </div>
+        {% endfor %}
+        {% for _ in range(5 - g.board|length) %}
+          <div class="card empty"></div>
+        {% endfor %}
+      </div>
+      {% if g.my_best %}<div class="hint">你当前牌型：{{ g.my_best }}</div>{% endif %}
+      {% if g.result %}<div class="result">{{ g.result }}</div>{% endif %}
+    </section>
+
+    <!-- 玩家区域 -->
+    <section class="seat me">
+      <div class="seat-head">
+        <span class="name">🙋 你</span>
+        <span class="stack">筹码 {{ g.my_stack }}</span>
+        {% if g.my_bet %}<span class="bet">本轮下注 {{ g.my_bet }}</span>{% endif %}
+      </div>
+      <div class="cards">
+        {% for c in g.my_cards %}
+          <div class="card {{ 'red' if c.red }}">
+            <span class="rank">{{ c.label }}</span>
+            <span class="suit">{{ c.suit_label }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- 操作区 -->
+    <section class="controls">
+      {% if g.game_over %}
+        <form method="post" action="{{ url_for('new_game') }}">
+          <button class="btn primary" type="submit">重新开始</button>
+        </form>
+
+      {% elif g.hand_over %}
+        <form method="post" action="{{ url_for('new_game') }}">
+          <button class="btn primary" type="submit">下一手</button>
+        </form>
+
+      {% elif g.my_turn %}
+        <form method="post" action="{{ url_for('action') }}" class="actions">
+          <button class="btn danger" name="action" value="fold">弃牌</button>
+
+          {% if g.actions.can_check %}
+            <button class="btn" name="action" value="check">过牌</button>
+          {% else %}
+            <button class="btn" name="action" value="call">
+              跟注 {{ g.actions.call_amount }}
+            </button>
+          {% endif %}
+
+          {% if g.actions.can_raise %}
+            <span class="raise-box">
+              <input type="number" name="amount"
+                     min="{{ g.actions.min_raise }}" max="{{ g.actions.max_raise }}"
+                     step="10" value="{{ g.actions.min_raise }}">
+              <button class="btn primary" name="action" value="raise">加注</button>
+            </span>
+          {% endif %}
+        </form>
+
+      {% else %}
+        <p class="waiting">等待机器人行动…</p>
+      {% endif %}
+    </section>
+
+    <!-- 日志 -->
+    <section class="log">
+      <h2>牌局记录</h2>
+      <ul>
+        {% for line in g.log %}
+          <li>{{ line }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+  </div>
+</body>
+</html>
