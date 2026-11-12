@@ -3,11 +3,11 @@
  *
  * 1. Checkout  拉代码
  * 2. Install   建虚拟环境装依赖
- * 3. Test      跑 25 个用例（牌型判定 + 游戏流程）
- * 4. Build     构建镜像
+ * 3. Test      跑 25 个用例
+ * 4. Build     构建镜像（8 分钟超时 + 明文进度日志）
  * 5. Push      推送到私有 registry
- * 6. Deploy    SSH 到目标机执行 deploy.sh
- * 7. Smoke     请求 /health 验证
+ * 6. Deploy    SSH 到目标机（禁止交互，10 秒连接超时）
+ * 7. Smoke     请求 /health（带连接超时）
  * ============================================================ */
 
 pipeline {
@@ -45,7 +45,8 @@ pipeline {
                     python3 --version
                     python3 -m venv $VENV
                     . $VENV/bin/activate
-                    pip install --no-cache-dir -r requirements.txt \
+                    pip install --no-cache-dir --retries 3 --timeout 30 \
+                        -r requirements.txt \
                         -i https://pypi.tuna.tsinghua.edu.cn/simple
                 '''
             }
@@ -65,16 +66,22 @@ pipeline {
         }
 
         stage('Build') {
+            // 单独限制 8 分钟：构建卡住也只失败这个阶段，不拖垮整条流水线
+            options { timeout(time: 8, unit: 'MINUTES') }
             steps {
                 sh '''
                     set -e
-                    docker build -t $FULL_IMAGE:$IMAGE_TAG -t $FULL_IMAGE:latest .
+                    # --progress=plain：把每个构建步骤逐行输出到日志，卡住时能一眼定位
+                    docker build --progress=plain \
+                        -t $FULL_IMAGE:$IMAGE_TAG \
+                        -t $FULL_IMAGE:latest .
                     docker images | grep $IMAGE_NAME
                 '''
             }
         }
 
         stage('Push') {
+            options { timeout(time: 5, unit: 'MINUTES') }
             steps {
                 sh '''
                     set -e
@@ -85,6 +92,7 @@ pipeline {
         }
 
         stage('Deploy') {
+            options { timeout(time: 5, unit: 'MINUTES') }
             steps {
                 withCredentials([
                     sshUserPrivateKey(
@@ -95,9 +103,14 @@ pipeline {
                 ]) {
                     sh '''
                         set -e
+                        # BatchMode=yes：禁止任何交互式提问，密钥问题立即失败而不是挂起
                         ssh -i "$SSH_KEY" \
                             -o StrictHostKeyChecking=no \
                             -o UserKnownHostsFile=/dev/null \
+                            -o BatchMode=yes \
+                            -o ConnectTimeout=10 \
+                            -o ServerAliveInterval=10 \
+                            -o ServerAliveCountMax=3 \
                             $SSH_USER@$DEPLOY_HOST \
                             "$DEPLOY_DIR/deploy.sh $FULL_IMAGE $IMAGE_TAG"
                     '''
@@ -106,10 +119,13 @@ pipeline {
         }
 
         stage('Smoke Test') {
+            options { timeout(time: 2, unit: 'MINUTES') }
             steps {
                 sh '''
                     set -e
-                    curl -fsS --retry 15 --retry-delay 2 --retry-connrefused \
+                    curl -fsS \
+                        --connect-timeout 5 --max-time 10 \
+                        --retry 10 --retry-delay 2 --retry-connrefused \
                         http://$DEPLOY_HOST:8080/health
                     echo ""
                     echo "服务健康检查通过"
